@@ -5,7 +5,6 @@ import lombok.*;
 import java.util.Set;
 
 @Entity
-@Table(name="users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,7 +19,7 @@ public class User {
     private String email;
     @Column(nullable = false)
     private String password;
-    @OneToMany(mappedBy = "created_by")
+    @OneToMany(mappedBy = "createdBy")
     private Set<Group> createdGroups;
 
     @OneToMany(mappedBy = "user")
