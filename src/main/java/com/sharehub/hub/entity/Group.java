@@ -1,13 +1,11 @@
 package com.sharehub.hub.entity;
 
-
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.util.Set;
 
 @Entity
-@Table(name = "groups")
+@Table(name = "groups_table")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,16 +19,14 @@ public class Group {
     @Column(nullable = false)
     private String name;
 
-    // Creator of the group
-    @ManyToOne
-    @JoinColumn(name = "created_by")
+    // Creator of the group - Required
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "created_by_user_id", nullable = false)
     private User createdBy;
 
-    // Members of this group
-    @OneToMany(mappedBy = "group")
+    @OneToMany(mappedBy = "group", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private Set<Membership> memberships;
-
-    // Files uploaded to this group
-    @OneToMany(mappedBy = "group")
+    // Files uploaded to this group - Keep CASCADE.ALL for deletion integrity
+    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<File> files;
 }

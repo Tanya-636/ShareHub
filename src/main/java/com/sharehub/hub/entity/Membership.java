@@ -8,23 +8,33 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+// Ensure a user has only one membership per group
+@Table(uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "group_id"})
+})
 public class Membership {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // User in the group
-    @ManyToOne
-    @JoinColumn(name = "user_id")
+    // User in the group - Required
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // Group to which the user belongs
-    @ManyToOne
-    @JoinColumn(name = "group_id")
+    // Group to which the user belongs - Required
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id", nullable = false)
     private Group group;
 
-    // Role in this group (e.g., "ADMIN" or "MEMBER")
+    // Role in this group (ADMIN, MEMBER)
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String role;
+    private GroupRole role;
+
+    // Status of the membership (ACTIVE, REMOVED)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MembershipStatus status;
 }

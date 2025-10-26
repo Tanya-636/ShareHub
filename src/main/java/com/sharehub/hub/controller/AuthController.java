@@ -1,5 +1,6 @@
 package com.sharehub.hub.controller;
 
+import com.sharehub.hub.dto.UserRegistrationRequest; // <-- NEW DTO IMPORT
 import com.sharehub.hub.entity.User;
 import com.sharehub.hub.repository.UserRepository;
 import com.sharehub.hub.service.JwtService;
@@ -19,8 +20,17 @@ public class AuthController {
     private final JwtService jwtService;
 
     @PostMapping("/register")
-    public String register(@RequestBody User user) {
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+    public String register(@RequestBody UserRegistrationRequest request) {
+
+        // Build the User entity from the DTO
+        User user = User.builder()
+                .email(request.getEmail())
+                .name(request.getName()) // <-- Uses the actual name collected by the UI
+                .password(passwordEncoder.encode(request.getPassword()))
+                .build();
+
+        // The problematic 'if (user.getName() == null) user.setName("Anonymous");' is now safely bypassed.
+
         userRepository.save(user);
         return "User registered successfully";
     }
