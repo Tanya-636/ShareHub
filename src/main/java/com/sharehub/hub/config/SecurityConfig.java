@@ -28,8 +28,15 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // 1. Allow Auth endpoints without token
                         .requestMatchers("/api/auth/**").permitAll()
-                        .anyRequest().authenticated()
+
+                        // 2. FIX: Allow ALL application APIs (/api/groups, /api/files, etc.)
+                        // for any valid token. This solves structural 403s.
+                        .requestMatchers("/api/**").authenticated()
+
+                        // 3. Deny access to any other root path
+                        .anyRequest().denyAll()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())

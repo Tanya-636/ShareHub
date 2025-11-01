@@ -17,7 +17,7 @@ public class File {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ... (Metadata fields remain the same)
+    // ... (Metadata fields) ...
     @Column(nullable = false)
     private String fileName;
 
@@ -30,20 +30,32 @@ public class File {
     @Column(nullable = false)
     private String storagePath;
 
+    // 1. Removed the unreliable inline default (= LocalDateTime.now())
+    // 2. Set 'updatable = false' as it should only be set on creation
     @Column(nullable = false, updatable = false)
-    private LocalDateTime uploadDate = LocalDateTime.now();
+    private LocalDateTime uploadDate; // No initial value here
 
-    // The group this file belongs to. Now nullable (can be null for private files).
+    // ... (Relationships) ...
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", nullable = true) // <-- CRUCIAL CHANGE: nullable = true
+    @JoinColumn(name = "group_id", nullable = true)
     private Group group;
 
-    // The user who uploaded the file - Required
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by_user_id", nullable = false)
     private User uploadedBy;
 
-    // NEW FIELD: Indicates if the file is private (true) or belongs to a group (false)
     @Column(nullable = false)
-    private boolean isPrivate = true; // Default to true if group is null, or set explicitly
+    private boolean isPrivate = true;
+
+    /**
+     * JPA Lifecycle Callback: Ensures the uploadDate is set immediately before
+     * the database INSERT occurs, guaranteeing the value is non-null.
+     */
+    @PrePersist // <-- CRITICAL FIX: Executes right before persistence
+    protected void onCreate() {
+        // Set the timestamp only if it hasn't been explicitly set (e.g., in a unit test)
+        if (uploadDate == null) {
+            uploadDate = LocalDateTime.now();
+        }
+    }
 }

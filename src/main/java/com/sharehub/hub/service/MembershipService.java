@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -20,16 +21,11 @@ public class MembershipService {
     private final GroupRepository groupRepository;
     private final MembershipRepository membershipRepository;
 
-    // --- Authorization Checks (Transactional for consistency fix) ---
-
-    // In MembershipService.java
-
-    // In MembershipService.java
+    // --- Authorization Checks (Guaranteed Read Consistency) ---
 
     @Transactional
     public void checkAdminPermission(Long adminId, Long groupId) {
-        // We no longer need to fetch the User/Group objects just for the check (improving efficiency)
-
+        // Uses the highly specific query to check role, status, user, and group atomically
         boolean isAdminActive = membershipRepository.findSpecificMembership(
                 groupId,
                 adminId,
@@ -42,19 +38,17 @@ public class MembershipService {
         }
     }
 
-    @Transactional // FIX: Standard transaction ensures visibility of recent commits
+    @Transactional
     public void checkActiveMembership(Long userId, Long groupId) {
-        User user = userService.getUserById(userId);
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("Group not found."));
-
-        // Check if user is an ACTIVE member (any role)
-        boolean isActive = membershipRepository
-                .findByGroupAndUser(group, user)
-                .filter(m -> m.getStatus() == MembershipStatus.ACTIVE)
-                .isPresent();
+        // Checks if ANY active membership (Admin or Member) exists
+        boolean isActive = membershipRepository.findAnyActiveMembership(
+                groupId,
+                userId,
+                MembershipStatus.ACTIVE
+        ).isPresent();
 
         if (!isActive) {
+            // This covers failure if the user is not a member OR is a member but status is REMOVED
             throw new AccessDeniedException("User is not an active member of this group.");
         }
     }
@@ -63,7 +57,7 @@ public class MembershipService {
 
     @Transactional
     public Membership addMember(Long adminId, Long groupId, String memberEmail) {
-        // 1. Authorization Check (Uses the fixed method above)
+        // 1. Authorization Check
         checkAdminPermission(adminId, groupId);
 
         // 2. Retrieve Entities
@@ -100,14 +94,18 @@ public class MembershipService {
     @Transactional(readOnly = true)
     public List<User> getActiveMembers(Long userId, Long groupId) {
         // Authorization: Any active member can see the list of members
-        checkActiveMembership(userId, groupId); // Uses the fixed method
+        checkActiveMembership(userId, groupId);
 
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("Group not found."));
+        // Uses the custom repository method to fetch users directly
+        List<User> members = membershipRepository.findAllActiveUsersByGroupId(
+                groupId,
+                MembershipStatus.ACTIVE
+        );
 
-        return membershipRepository.findAllByGroupAndStatus(group, MembershipStatus.ACTIVE)
-                .stream()
-                .map(Membership::getUser)
-                .toList();
+        // FINAL SAFETY NET: Filters out any null User objects that resulted from orphaned foreign keys
+        // (This prevents the API from crashing or returning null elements)
+        return members.stream()
+                .filter(user -> user != null)
+                .collect(Collectors.toList());
     }
 }
